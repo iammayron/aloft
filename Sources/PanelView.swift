@@ -5,6 +5,7 @@ struct PanelView: View {
     @ObservedObject var windows: WindowList
     @ObservedObject var thumbnails: Thumbnails
     @ObservedObject var settings: Settings
+    @ObservedObject var updater: Updater
     @State private var query = ""
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
@@ -47,6 +48,7 @@ struct PanelView: View {
                 grid
             }
 
+            updateBanner
             Divider().opacity(0.5)
             footer
         }
@@ -69,6 +71,9 @@ struct PanelView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tint)
             Text("Aloft").font(.headline)
+            Text(Updater.current)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
             if ready, !windows.pinned.isEmpty {
                 Text("\(windows.pinned.count) pinned")
                     .font(.system(size: 11))
@@ -80,6 +85,18 @@ struct PanelView: View {
                     .buttonStyle(.glass)
                     .controlSize(.small)
             }
+            Menu {
+                Button("Check for Updates") { Task { await updater.check(manual: true) } }
+                Toggle("Check Automatically", isOn: $settings.autoUpdate)
+                Divider()
+                Text("Aloft \(Updater.current)")
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Updates")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -187,6 +204,46 @@ struct PanelView: View {
     }
 
     // MARK: - Footer
+
+    /// Only ever one line, and only when there is something to say. An update notice
+    /// that is always present becomes furniture nobody reads.
+    @ViewBuilder
+    private var updateBanner: some View {
+        switch updater.phase {
+        case let .available(version):
+            bannerRow {
+                Text("Aloft \(version) is available")
+                Spacer()
+                Button("Update") { Task { await updater.install() } }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.small)
+            }
+        case .downloading, .installing:
+            bannerRow {
+                ProgressView().controlSize(.small).scaleEffect(0.7)
+                Text(updater.phase == .downloading ? "Downloading update…" : "Installing…")
+                Spacer()
+            }
+        case let .failed(reason):
+            bannerRow {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(reason)
+                Spacer()
+            }
+        case .idle, .checking:
+            EmptyView()
+        }
+    }
+
+    private func bannerRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            Divider().opacity(0.5)
+            HStack(spacing: 7) { content() }
+                .font(.system(size: 11))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+        }
+    }
 
     private var footer: some View {
         HStack(spacing: 6) {

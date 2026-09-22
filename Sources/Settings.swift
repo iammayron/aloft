@@ -58,6 +58,7 @@ struct Shortcut: Codable, Equatable {
 final class Settings: ObservableObject {
     @Published var shortcut: Shortcut { didSet { write(shortcut, "shortcut") } }
     @Published var soundsEnabled: Bool { didSet { defaults.set(soundsEnabled, forKey: "sounds") } }
+    @Published var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: "autoUpdate") } }
     /// False when the stored shortcut could not be registered — something else owns
     /// it now, perhaps since it was chosen.
     @Published var shortcutActive = true
@@ -97,6 +98,7 @@ final class Settings: ObservableObject {
         hasStoredShortcut = stored != nil
         shortcut = stored ?? .fallback
         soundsEnabled = defaults.object(forKey: "sounds") as? Bool ?? true
+        autoUpdate = defaults.object(forKey: "autoUpdate") as? Bool ?? true
         onboarded = defaults.bool(forKey: "onboarded")
         askedAccessibility = defaults.bool(forKey: "askedAX")
         askedScreenRecording = defaults.bool(forKey: "askedSC")

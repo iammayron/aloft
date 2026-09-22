@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     let windows = WindowList()
     let thumbnails = Thumbnails()
     let settings = Settings()
+    let updater = Updater()
     @Published var pinning = false
     @Published var menuBarReady = false {
         didSet {
@@ -36,7 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         statusItem.onOpen = { [weak self] in self?.coachmark.dismiss() }
         statusItem.onClose = { [weak self] in self?.settings.panelClosed += 1 }
         statusItem.install { [self] in
-            PanelView(windows: windows, thumbnails: thumbnails, settings: settings)
+            PanelView(windows: windows, thumbnails: thumbnails, settings: settings,
+                      updater: updater)
         }
         // The mark teaches where the icon is. Once onboarding is done it would just be
         // noise on every launch.
@@ -174,6 +176,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
         Task { @MainActor in
             for await seen in settings.$panelSeen.values where seen { coachmark.dismiss() }
+        }
+
+        updater.setAutomatic(settings.autoUpdate)
+        Task { @MainActor in
+            for await enabled in settings.$autoUpdate.values { updater.setAutomatic(enabled) }
         }
 
         Task { @MainActor in
