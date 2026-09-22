@@ -40,11 +40,13 @@ struct Shortcut: Codable, Equatable {
     /// that silently does nothing.
     @MainActor
     static func firstAvailable() -> Shortcut {
+        // Two-modifier combinations are the ones other apps take, and the ones this
+        // probe cannot clear. Start somewhere unlikely to be contested.
         let candidates = [
-            Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .command]).rawValue, label: "T"),
             Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "T"),
             Shortcut(keyCode: 35, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "P"),
             Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.shift, .control, .command]).rawValue, label: "T"),
+            Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .command]).rawValue, label: "T"),
         ]
         return candidates.first(where: HotKey.shared.isAvailable) ?? fallback
     }
@@ -57,6 +59,12 @@ final class Settings: ObservableObject {
     /// False when the stored shortcut could not be registered — something else owns
     /// it now, perhaps since it was chosen.
     @Published var shortcutActive = true
+
+    /// Set when pressing the shortcut visibly activated some other app. Carbon can
+    /// only report conflicts with other Carbon hotkeys; an app using an event tap
+    /// registers nothing, so the only evidence is what happens when the key is
+    /// actually pressed.
+    @Published var conflictingApp: String?
 
     private(set) var hasStoredShortcut = false
 
@@ -121,6 +129,7 @@ struct ShortcutRecorder: View {
     @Binding var shortcut: Shortcut
     var compact = false
     var active = true
+    var conflict: String?
 
     @State private var recording = false
     @State private var monitor: Any?
@@ -151,6 +160,7 @@ struct ShortcutRecorder: View {
         .tint(recording ? .accentColor : nil)
         .overlay(alignment: .bottom) {
             if let message = problem.map({ $0 == .taken ? "Already used by another app" : "Needs ⌘, ⌃ or ⌥" })
+                ?? conflict.map({ "Also opens \($0). Pick another." })
                 ?? (active ? nil : "Not active, in use by another app") {
                 Text(message)
                     .font(.system(size: 10))
@@ -162,7 +172,8 @@ struct ShortcutRecorder: View {
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: recording)
         .animation(.easeOut(duration: 0.2), value: problem)
-        .tint(active ? nil : .orange)
+        .animation(.easeOut(duration: 0.2), value: conflict)
+        .tint(active && conflict == nil ? nil : .orange)
         .onDisappear(perform: stop)
     }
 

@@ -40,6 +40,7 @@ final class Coachmark {
                          seconds: Double) {
         guard let screen = NSScreen.main else { return }
         let size = NSSize(width: 268, height: 78)
+        var arrowOffset: CGFloat = 0
         let window = NSPanel(contentRect: NSRect(origin: .zero, size: size),
                              styleMask: [.nonactivatingPanel, .borderless],
                              backing: .buffered, defer: false)
@@ -51,14 +52,16 @@ final class Coachmark {
         window.isOpaque = false
         window.hasShadow = false
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: NudgeView(text: text, symbol: symbol) {
-            [weak self] in self?.dismiss()
-        })
+        window.contentView = NSHostingView(rootView: NudgeView(
+            text: text, symbol: symbol, arrowOffset: arrowOffset) { [weak self] in self?.dismiss() })
 
-        window.setFrameOrigin(NSPoint(
-            x: min(max(centerX - size.width / 2, screen.visibleFrame.minX + 8),
-                   screen.visibleFrame.maxX - size.width - 8),
-            y: y - size.height + 12))
+        let originX = min(max(centerX - size.width / 2, screen.visibleFrame.minX + 8),
+                          screen.visibleFrame.maxX - size.width - 8)
+        // When the capsule is pushed off its anchor by the screen edge, the arrow has
+        // to slide inside it instead, or it points at nothing.
+        let reach = size.width / 2 - 26
+        arrowOffset = min(max(centerX - (originX + size.width / 2), -reach), reach)
+        window.setFrameOrigin(NSPoint(x: originX, y: y - size.height + 12))
         window.orderFrontRegardless()
         panel = window
 
@@ -92,6 +95,7 @@ final class Coachmark {
 private struct NudgeView: View {
     let text: String
     let symbol: String
+    let arrowOffset: CGFloat
     let dismiss: () -> Void
     @State private var arrived = false
     @State private var bouncing = false
@@ -101,9 +105,7 @@ private struct NudgeView: View {
             Image(systemName: "arrowtriangle.up.fill")
                 .font(.system(size: 13))
                 .foregroundStyle(.tint)
-                .offset(y: bouncing ? -4 : 1)
-                .animation(.easeInOut(duration: 0.62).repeatForever(autoreverses: true),
-                           value: bouncing)
+                .offset(x: arrowOffset)
 
             HStack(spacing: 8) {
                 Image(systemName: symbol)
@@ -124,6 +126,10 @@ private struct NudgeView: View {
             .shadow(color: .black.opacity(0.22), radius: 11, y: 3)
         }
         .padding(.top, 2)
+        // The whole mark bobs, not just the arrowhead: movement at this size reads
+        // from the corner of the eye, a 4pt twitch does not.
+        .offset(y: bouncing ? -5 : 2)
+        .animation(.easeInOut(duration: 0.72).repeatForever(autoreverses: true), value: bouncing)
         .scaleEffect(arrived ? 1 : 0.7)
         .opacity(arrived ? 1 : 0)
         .animation(.spring(response: 0.42, dampingFraction: 0.62), value: arrived)

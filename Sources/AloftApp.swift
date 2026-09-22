@@ -5,21 +5,10 @@ import SwiftUI
 struct AloftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
+    // The menu bar icon is an NSStatusItem owned by the delegate, not a MenuBarExtra.
+    // This scene exists only because an App must declare one.
     var body: some Scene {
-        // Read the flag HERE, during body evaluation. Reading it inside the Binding's
-        // getter defers it past evaluation, so SwiftUI records no dependency and the
-        // scene never re-runs when it flips: the icon simply never appears.
-        let ready = delegate.menuBarReady
-        return MenuBarExtra(isInserted: Binding(
-            get: { ready },
-            set: { delegate.menuBarReady = $0 })) {
-            PanelView(windows: delegate.windows,
-                      thumbnails: delegate.thumbnails,
-                      settings: delegate.settings)
-        } label: {
-            Image(systemName: delegate.pinning ? "pin.fill" : "pin")
-        }
-        .menuBarExtraStyle(.window)
+        SwiftUI.Settings { EmptyView() }   // our own Settings class shadows the scene
     }
 }
 
@@ -30,13 +19,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     let settings = Settings()
     @Published var pinning = false
     @Published var menuBarReady = false {
-        didSet { if menuBarReady, !oldValue { coachmark.showAtMenuBar("Aloft lives up here") } }
+        didSet {
+            guard menuBarReady, !oldValue else { return }
+            installStatusItem()
+        }
     }
 
     private let coachmark = Coachmark()
+    private let statusItem = StatusItemController()
 
     private var onboarding: NSWindow?
     private var intro: NSWindow?
+
+    private func installStatusItem() {
+        statusItem.onOpen = { [weak self] in self?.coachmark.dismiss() }
+        statusItem.install { [self] in
+            PanelView(windows: windows, thumbnails: thumbnails, settings: settings)
+        }
+        if let frame = statusItem.buttonFrame {
+            coachmark.show("Aloft lives up here", centerX: frame.midX, below: frame.minY)
+        } else {
+            coachmark.showAtMenuBar("Aloft lives up here")
+        }
+    }
+
+    /// Pinning never changes which app is in front, so if something else is frontmost
+    /// a moment later, another app answered the same key press. That is the only
+    /// detectable trace of a conflict with an event-tap hotkey.
+    private func pinFrontmost() {
+        let before = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        windows.toggleFrontmost()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(550))
+            guard let now = NSWorkspace.shared.frontmostApplication,
+                  now.bundleIdentifier != before,
+                  now.processIdentifier != ProcessInfo.processInfo.processIdentifier
+            else { return }
+            settings.conflictingApp = now.localizedName
+        }
+    }
 
     /// Full-screen title card on first run. It sits above everything including the
     /// menu bar, so it is dismissible by click as well as on its own timer.
@@ -129,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             Task { await thumbnails.beginSession() }
         }
 
-        HotKey.shared.onPress = { [weak self] in self?.windows.toggleFrontmost() }
+        HotKey.shared.onPress = { [weak self] in self?.pinFrontmost() }
         if !settings.hasStoredShortcut { settings.shortcut = Shortcut.firstAvailable() }
         settings.shortcutActive = HotKey.shared.apply(settings.shortcut)
 
@@ -139,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
         Task { @MainActor in
             for await shortcut in settings.$shortcut.values {
+                settings.conflictingApp = nil        // a new combination is unproven, not guilty
                 settings.shortcutActive = HotKey.shared.apply(shortcut)
             }
         }
@@ -146,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         Task { @MainActor in
             for await value in windows.$pinned.values {
                 pinning = !value.isEmpty
+                statusItem.setPinning(pinning)
                 // First pin during onboarding: point at the marker it just produced,
                 // or the user never learns what that dot in the title bar means.
                 if !settings.onboarded, let first = value.first,

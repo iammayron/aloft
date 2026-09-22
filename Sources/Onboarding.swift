@@ -176,7 +176,8 @@ struct OnboardingView: View {
                 }
 
             case .shortcut:
-                ShortcutRecorder(shortcut: $settings.shortcut, active: settings.shortcutActive)
+                ShortcutRecorder(shortcut: $settings.shortcut, active: settings.shortcutActive,
+                                 conflict: settings.conflictingApp)
                     .controlSize(.large)
                 primary("Continue") { advance() }
 

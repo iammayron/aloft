@@ -181,7 +181,8 @@ struct PanelView: View {
                 Text("Pin frontmost")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                ShortcutRecorder(shortcut: $settings.shortcut, compact: true, active: settings.shortcutActive)
+                ShortcutRecorder(shortcut: $settings.shortcut, compact: true, active: settings.shortcutActive,
+                                 conflict: settings.conflictingApp)
                     .controlSize(.mini)
             }
             Spacer()
