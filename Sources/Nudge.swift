@@ -19,7 +19,7 @@ final class Coachmark {
     private static let overlap: CGFloat = 7
     /// Optical nudge. The status button's rect is wider than the glyph drawn in it and
     /// is not centred on it, so dead-centre on the rect reads as slightly right.
-    private static let horizontalTrim: CGFloat = -3
+    private static let horizontalTrim: CGFloat = -2
 
     /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
     /// app adds or drops one, and a mark measured once drifts off its target.
