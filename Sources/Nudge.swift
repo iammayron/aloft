@@ -17,9 +17,10 @@ final class Coachmark {
     private static let size = NSSize(width: 290, height: 82)
     /// How far the tip rides up into the menu bar button.
     private static let overlap: CGFloat = 7
-    /// Optical nudge. The status button's rect is wider than the glyph drawn in it and
-    /// is not centred on it, so dead-centre on the rect reads as slightly right.
-    private static let horizontalTrim: CGFloat = -2
+    /// Optical trim on the arrow's x. Zero is the button rect's true centre, which is
+    /// also where the template image is drawn, so this should stay at zero unless the
+    /// glyph itself is visibly off-centre in its rect.
+    private static let horizontalTrim: CGFloat = 0
 
     /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
     /// app adds or drops one, and a mark measured once drifts off its target.
