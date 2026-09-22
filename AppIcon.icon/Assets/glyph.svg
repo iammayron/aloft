@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Back window: the one that gets covered. -->
+  <rect x="372" y="372" width="475" height="375" rx="66" fill="#FFFFFF" fill-opacity="0.42"/>
+  <!-- Front window: raised, solid, reads at 16px as a square on a square. -->
+  <rect x="177" y="277" width="475" height="375" rx="66" fill="#FFFFFF"/>
+</svg>

@@ -1,0 +1,5 @@
+{
+  "fill" : { "automatic-gradient" : "extended-srgb:0.09000,0.36000,0.87000,1.00000" },
+  "groups" : [ { "layers" : [ { "image-name" : "glyph.svg", "name" : "Windows" } ] } ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}
