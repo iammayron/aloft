@@ -8,6 +8,13 @@ struct PanelView: View {
     @ObservedObject var updater: Updater
     @State private var query = ""
 
+    private static let repository = "https://github.com/iammayron/aloft"
+
+    private static func open(_ address: String) {
+        guard let url = URL(string: address) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
     private static let rowSpacing: CGFloat = 10
     private static let gridPadding: CGFloat = 12
@@ -85,7 +92,15 @@ struct PanelView: View {
             Menu {
                 Button("Check for Updates") { Task { await updater.check(manual: true) } }
                 Toggle("Check Automatically", isOn: $settings.autoUpdate)
+
                 Divider()
+
+                Button("About the Developer") { Self.open("https://mayronalves.com") }
+                Button("View on GitHub") { Self.open(Self.repository) }
+                Button("Report an Issue") { Self.open("\(Self.repository)/issues/new") }
+
+                Divider()
+
                 Text("Aloft \(Updater.current)")
             } label: {
                 Image(systemName: "ellipsis.circle")
