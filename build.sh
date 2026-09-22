@@ -41,4 +41,11 @@ xcrun actool AppIcon.icon --compile "$APP/Contents/Resources" --app-icon AppIcon
   --output-partial-info-plist /tmp/aloft-icon.plist > /dev/null
 
 codesign --force --options runtime --sign "$IDENTITY" "$APP"
+
+# Every build deletes and recreates the bundle, so anything holding a reference to the
+# old one (System Settings' privacy rows, the Dock) loses the icon until it is
+# re-registered.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -f "$APP"
+
 echo "built $(pwd)/$APP"
