@@ -16,7 +16,10 @@ final class Coachmark {
     /// content clips the bob and the shadow at its own edge.
     private static let size = NSSize(width: 290, height: 82)
     /// How far the tip rides up into the menu bar button.
-    private static let overlap: CGFloat = 5
+    private static let overlap: CGFloat = 7
+    /// Optical nudge. The status button's rect is wider than the glyph drawn in it and
+    /// is not centred on it, so dead-centre on the rect reads as slightly right.
+    private static let horizontalTrim: CGFloat = -3
 
     /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
     /// app adds or drops one, and a mark measured once drifts off its target.
@@ -43,19 +46,20 @@ final class Coachmark {
     private func place() -> Bool {
         guard let target = anchor?() else { return false }
 
-        let point = NSPoint(x: target.midX, y: target.minY - 1)
+        let centre = target.midX + Self.horizontalTrim
+        let point = NSPoint(x: centre, y: target.minY - 1)
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) else {
             log.error("no screen at \(target.midX, privacy: .public),\(target.minY, privacy: .public)")
             return false
         }
 
         let size = Self.size
-        let originX = min(max(target.midX - size.width / 2, screen.frame.minX + 6),
+        let originX = min(max(centre - size.width / 2, screen.frame.minX + 6),
                           screen.frame.maxX - size.width - 6)
         // Where the screen edge pushes the bubble off its target, the pointer slides
         // along it instead. Must be known before the view is built.
         let reach = size.width / 2 - 24
-        let arrow = min(max(target.midX - (originX + size.width / 2), -reach), reach)
+        let arrow = min(max(centre - (originX + size.width / 2), -reach), reach)
         // Content is pinned to the top of the window, so place the window such that
         // the bubble's top edge lands just inside the button's bottom edge.
         let origin = NSPoint(x: originX, y: target.minY + Self.overlap - size.height)
