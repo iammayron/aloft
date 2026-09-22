@@ -36,10 +36,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         statusItem.install { [self] in
             PanelView(windows: windows, thumbnails: thumbnails, settings: settings)
         }
-        if let frame = statusItem.buttonFrame {
-            coachmark.show("Aloft lives up here", centerX: frame.midX, below: frame.minY)
-        } else {
-            coachmark.showAtMenuBar("Aloft lives up here")
+        // The button has no laid-out window the instant it is created, so wait for a
+        // real frame rather than anchoring the mark to a zero rect.
+        Task { @MainActor in
+            for attempt in 0..<10 {
+                if let frame = statusItem.buttonFrame, frame.width > 0 {
+                    coachmark.show("Click here to open Aloft",
+                                   centerX: frame.midX, below: frame.minY)
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(attempt < 3 ? 100 : 300))
+            }
+            coachmark.showAtMenuBar("Click here to open Aloft")
         }
     }
 

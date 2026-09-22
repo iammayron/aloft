@@ -186,7 +186,8 @@ struct OnboardingView: View {
 
             case .menuBar:
                 VStack(spacing: 11) {
-                    hint("pin", "Click the pin in your menu bar")
+                    hint("pin", "Click the pin in your menu bar", lead: true)
+                        .padding(.bottom, 5)
                     hint("square.grid.2x2", "Pick any window from the grid to pin it")
                     hint("keyboard", "Change your shortcut in the panel footer")
                     hint("power", "Quit Aloft from that same footer")
@@ -250,16 +251,24 @@ struct OnboardingView: View {
             .controlSize(.small)
     }
 
-    private func hint(_ symbol: String, _ text: String) -> some View {
-        HStack(spacing: 9) {
+    /// `lead` marks the one action the step is actually waiting on. It gets weight and
+    /// a slow breath rather than a button: it describes something to do elsewhere, and
+    /// dressing it as a control would invite a click that does nothing here.
+    private func hint(_ symbol: String, _ text: String, lead: Bool = false) -> some View {
+        HStack(spacing: lead ? 10 : 9) {
             Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: lead ? 14 : 11, weight: .semibold))
                 .foregroundStyle(.tint)
             Text(text)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .font(.system(size: lead ? 14 : 12, weight: lead ? .semibold : .regular))
+                .foregroundStyle(lead ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         }
         .fixedSize()
+        .opacity(lead && entered ? 0.72 : 1)
+        .animation(lead ? .easeInOut(duration: 1.3).repeatForever(autoreverses: true) : .default,
+                   value: entered)
+        .onAppear { if lead { entered = true } }
+        .onDisappear { if lead { entered = false } }
     }
 
     private func grantedLabel(_ text: String) -> some View {
