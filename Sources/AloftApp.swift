@@ -6,7 +6,9 @@ struct AloftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: Binding(
+            get: { delegate.menuBarReady },
+            set: { delegate.menuBarReady = $0 })) {
             PanelView(windows: delegate.windows,
                       thumbnails: delegate.thumbnails,
                       settings: delegate.settings)
@@ -18,11 +20,12 @@ struct AloftApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, ObservableObject {
     let windows = WindowList()
     let thumbnails = Thumbnails()
     let settings = Settings()
     @Published var pinning = false
+    @Published var menuBarReady = false
 
     private var monitor: Any?
     private var onboarding: NSWindow?
@@ -72,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         window.isReleasedWhenClosed = false
         let host = NSHostingView(rootView: OnboardingView(
             settings: settings, windows: windows, thumbnails: thumbnails,
+            unlockMenuBar: { [weak self] in self?.menuBarReady = true },
             finish: { [weak self] in
                 self?.settings.onboarded = true
                 self?.onboarding?.close()
@@ -83,14 +87,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         window.contentView = host
         window.setContentSize(OnboardingView.size)
         window.center()
+        window.delegate = self
         onboarding = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
+    /// Closing onboarding early must not strand the app with no menu bar icon and no
+    /// window — that would leave no way to use or quit it.
+    func windowWillClose(_ notification: Notification) {
+        guard (notification.object as? NSWindow) === onboarding else { return }
+        onboarding = nil
+        settings.onboarded = true
+        menuBarReady = true
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         windows.refresh()
         if settings.onboarded {
+            menuBarReady = true
             if !AX.isTrusted { AX.requestTrust() }
         } else {
             showIntro()

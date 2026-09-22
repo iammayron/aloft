@@ -35,7 +35,7 @@ enum Step: Int, CaseIterable {
         case .accessibility:
             "Aloft needs Accessibility to list your open windows and to raise the ones you pin. It never types or clicks for you."
         case .previews:
-            "Screen Recording lets the picker show live thumbnails instead of app icons. Entirely optional — pinning works without it."
+            "The picker shows a live thumbnail of every open window, so you pick the one you mean at a glance. Screen Recording is what draws them."
         case .shortcut:
             "This pins whichever window you're looking at, from anywhere. Click the key combination to change it."
         case .firstPin:
@@ -54,6 +54,7 @@ struct OnboardingView: View {
     @ObservedObject var settings: Settings
     @ObservedObject var windows: WindowList
     @ObservedObject var thumbnails: Thumbnails
+    let unlockMenuBar: () -> Void
     let finish: () -> Void
 
     @State private var step: Step = .welcome
@@ -150,7 +151,7 @@ struct OnboardingView: View {
                     primary("Enable Previews") {
                         Task { await thumbnails.requestAccess() }
                     }
-                    secondary("Skip — use app icons") { advance() }
+                    waitingLabel("Waiting for permission…")
                 }
 
             case .shortcut:
@@ -279,6 +280,9 @@ struct OnboardingView: View {
 
     private func advance() {
         guard let next = Step(rawValue: step.rawValue + 1) else { return }
+        // The menu-bar step asks the user to open the panel, so the icon has to exist
+        // by the time they get there.
+        if next == .menuBar { unlockMenuBar() }
         Chime.step.play(if: settings.soundsEnabled)
         withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = next }
     }
