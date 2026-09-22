@@ -14,7 +14,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover = NSPopover()
     var onOpen: (() -> Void)?
 
-    var buttonFrame: CGRect? { item?.button?.window?.frame }
+    /// Only once the status item has actually been placed in the menu bar. Straight
+    /// after creation its window reports a (0,0) origin, which is a real rect with a
+    /// real size and silently anchors anything that trusts it to the bottom-left of
+    /// the screen.
+    var buttonFrame: CGRect? {
+        guard let frame = item?.button?.window?.frame, frame.width > 0, frame.height > 0,
+              let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }),
+              frame.maxY > screen.visibleFrame.maxY        // inside the menu bar strip
+        else { return nil }
+        return frame
+    }
 
     func install<Content: View>(@ViewBuilder content: () -> Content) {
         guard item == nil else { return }

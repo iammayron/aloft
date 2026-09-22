@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 /// A pointer that parks itself under something the user needs to look at.
 /// Used for anything the flow asks for but cannot click on the user's behalf: the
@@ -8,11 +9,13 @@ import SwiftUI
 @MainActor
 final class Coachmark {
     private var panel: NSPanel?
+    private let log = Logger(subsystem: "dev.mayron.aloft", category: "nudge")
 
     /// Anchors are in screen (Cocoa) coordinates: centre x, and the y the mark hangs
-    /// below.
+    /// below. `seconds: 0` keeps it up until the user acts, which is what a mark
+    /// asking for a click needs.
     func show(_ text: String, symbol: String = "pin.fill", centerX: CGFloat, below y: CGFloat,
-              seconds: Double = 12) {
+              seconds: Double = 0) {
         dismiss()
         present(text: text, symbol: symbol, centerX: centerX, below: y, seconds: seconds)
     }
@@ -45,10 +48,26 @@ final class Coachmark {
         // and the arrow ends up pointing at nothing.
         let anchor = NSPoint(x: centerX, y: y - 1)
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) })
-            ?? NSScreen.main else { return }
-        let size = NSSize(width: 268, height: 78)
-        var arrowOffset: CGFloat = 0
-        let window = NSPanel(contentRect: NSRect(origin: .zero, size: size),
+            ?? NSScreen.main else {
+            log.error("no screen contains anchor \(centerX, privacy: .public),\(y, privacy: .public)")
+            return
+        }
+
+        let size = NSSize(width: 268, height: 74)
+        let originX = min(max(centerX - size.width / 2, screen.visibleFrame.minX + 8),
+                          screen.visibleFrame.maxX - size.width - 8)
+        // When the screen edge pushes the capsule off its anchor, the arrow slides
+        // inside it instead. This has to be known before the view is built.
+        let reach = size.width / 2 - 26
+        let arrowOffset = min(max(centerX - (originX + size.width / 2), -reach), reach)
+        let origin = NSPoint(x: originX, y: y - size.height)
+        guard screen.frame.contains(NSPoint(x: origin.x + size.width / 2,
+                                            y: origin.y + size.height - 2)) else {
+            log.error("refusing off-screen mark at \(origin.x, privacy: .public),\(origin.y, privacy: .public)")
+            return
+        }
+
+        let window = NSPanel(contentRect: NSRect(origin: origin, size: size),
                              styleMask: [.nonactivatingPanel, .borderless],
                              backing: .buffered, defer: false)
         window.isFloatingPanel = true
@@ -61,17 +80,14 @@ final class Coachmark {
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: NudgeView(
             text: text, symbol: symbol, arrowOffset: arrowOffset) { [weak self] in self?.dismiss() })
-
-        let originX = min(max(centerX - size.width / 2, screen.visibleFrame.minX + 8),
-                          screen.visibleFrame.maxX - size.width - 8)
-        // When the capsule is pushed off its anchor by the screen edge, the arrow has
-        // to slide inside it instead, or it points at nothing.
-        let reach = size.width / 2 - 26
-        arrowOffset = min(max(centerX - (originX + size.width / 2), -reach), reach)
-        window.setFrameOrigin(NSPoint(x: originX, y: y - size.height + 12))
+        window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         panel = window
 
+        log.info("mark at \(origin.x, privacy: .public),\(origin.y, privacy: .public) arrow \(arrowOffset, privacy: .public) screen \(screen.frame.debugDescription, privacy: .public)")
+
+        // seconds <= 0 means it stays until the user acts on it.
+        guard seconds > 0 else { return }
         Task {
             try? await Task.sleep(for: .seconds(seconds))
             dismiss()
@@ -135,8 +151,8 @@ private struct NudgeView: View {
         .padding(.top, 2)
         // The whole mark bobs, not just the arrowhead: movement at this size reads
         // from the corner of the eye, a 4pt twitch does not.
-        .offset(y: bouncing ? -5 : 2)
-        .animation(.easeInOut(duration: 0.72).repeatForever(autoreverses: true), value: bouncing)
+        .offset(y: bouncing ? -7 : 3)
+        .animation(.easeInOut(duration: 0.66).repeatForever(autoreverses: true), value: bouncing)
         .scaleEffect(arrived ? 1 : 0.7)
         .opacity(arrived ? 1 : 0)
         .animation(.spring(response: 0.42, dampingFraction: 0.62), value: arrived)

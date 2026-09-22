@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 @main
 struct AloftApp: App {
@@ -36,16 +37,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         statusItem.install { [self] in
             PanelView(windows: windows, thumbnails: thumbnails, settings: settings)
         }
+        // The mark teaches where the icon is. Once onboarding is done it would just be
+        // noise on every launch.
+        guard !settings.onboarded else { return }
+
         // The button has no laid-out window the instant it is created, so wait for a
         // real frame rather than anchoring the mark to a zero rect.
         Task { @MainActor in
             for attempt in 0..<10 {
-                if let frame = statusItem.buttonFrame, frame.width > 0 {
+                if let frame = statusItem.buttonFrame {
                     coachmark.show("Click here to open Aloft",
                                    centerX: frame.midX, below: frame.minY)
                     return
                 }
-                try? await Task.sleep(for: .milliseconds(attempt < 3 ? 100 : 300))
+                Logger(subsystem: "dev.mayron.aloft", category: "nudge")
+                    .info("attempt \(attempt, privacy: .public): no button frame yet")
+                try? await Task.sleep(for: .milliseconds(attempt < 3 ? 120 : 400))
             }
             coachmark.showAtMenuBar("Click here to open Aloft")
         }
