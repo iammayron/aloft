@@ -104,6 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         let host = NSHostingView(rootView: OnboardingView(
             settings: settings, windows: windows, thumbnails: thumbnails,
             unlockMenuBar: { [weak self] in self?.menuBarReady = true },
+            refocus: { [weak self] in
+                NSApp.activate(ignoringOtherApps: true)
+                self?.onboarding?.makeKeyAndOrderFront(nil)
+            },
             finish: { [weak self] in
                 self?.settings.onboarded = true
                 self?.settings.step = 0

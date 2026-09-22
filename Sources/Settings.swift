@@ -40,9 +40,11 @@ struct Shortcut: Codable, Equatable {
     /// that silently does nothing.
     @MainActor
     static func firstAvailable() -> Shortcut {
-        // Two-modifier combinations are the ones other apps take, and the ones this
-        // probe cannot clear. Start somewhere unlikely to be contested.
+        // ⌃⌘A first by preference. Two-modifier combinations are the ones other apps
+        // take and the ones the Carbon probe cannot clear, so the rest add a third.
         let candidates = [
+            Shortcut(keyCode: 0, modifiers: NSEvent.ModifierFlags([.control, .command]).rawValue, label: "A"),
+            Shortcut(keyCode: 0, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "A"),
             Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "T"),
             Shortcut(keyCode: 35, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "P"),
             Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.shift, .control, .command]).rawValue, label: "T"),

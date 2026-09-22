@@ -55,6 +55,7 @@ struct OnboardingView: View {
     @ObservedObject var windows: WindowList
     @ObservedObject var thumbnails: Thumbnails
     let unlockMenuBar: () -> Void
+    let refocus: () -> Void
     let finish: () -> Void
 
     @State private var step: Step
@@ -62,11 +63,13 @@ struct OnboardingView: View {
     @State private var entered = false
 
     init(settings: Settings, windows: WindowList, thumbnails: Thumbnails,
-         unlockMenuBar: @escaping () -> Void, finish: @escaping () -> Void) {
+         unlockMenuBar: @escaping () -> Void, refocus: @escaping () -> Void,
+         finish: @escaping () -> Void) {
         self.settings = settings
         self.windows = windows
         self.thumbnails = thumbnails
         self.unlockMenuBar = unlockMenuBar
+        self.refocus = refocus
         self.finish = finish
         _step = State(initialValue: Step(rawValue: settings.step) ?? .welcome)
     }
@@ -296,6 +299,9 @@ struct OnboardingView: View {
     }
 
     private func celebrate() async {
+        // Granting happens in System Settings, which is now in front. Come back before
+        // playing the chime, or the reward lands behind another window.
+        if step == .accessibility || step == .previews { refocus() }
         if step == .previews { await thumbnails.beginSession() }
         if step == .accessibility { windows.refresh() }
         Chime.granted.play(if: settings.soundsEnabled)
