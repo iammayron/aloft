@@ -45,6 +45,11 @@ enum AX {
 
     static var isTrusted: Bool { AXIsProcessTrusted() }
 
+    static func openSettings() {
+        NSWorkspace.shared.open(URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
     static func requestTrust() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)

@@ -169,6 +169,9 @@ struct PanelView: View {
                 .buttonStyle(.glass)
                 .controlSize(.small)
                 .help("Screen Recording lets Aloft draw live window previews. Pinning works without it.")
+                .contextMenu {
+                    Button("Open Privacy Settings") { Thumbnails.openSettings() }
+                }
             } else {
                 Text("Pin frontmost")
                     .font(.system(size: 11))

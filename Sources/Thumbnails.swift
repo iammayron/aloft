@@ -44,15 +44,18 @@ final class Thumbnails: ObservableObject {
         sessionToken += 1
     }
 
+    /// Raises the system prompt and nothing else. Opening the Settings pane in the
+    /// same click stacks a second window on top of that dialog, which reads as the
+    /// app having fired twice.
     func requestAccess() async {
-        // Prompts on first call; afterwards macOS only shows it in Settings, so open
-        // the pane too rather than leaving the button looking dead.
-        if !CGRequestScreenCaptureAccess() {
-            NSWorkspace.shared.open(URL(string:
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-        }
+        _ = CGRequestScreenCaptureAccess()
         granted = CGPreflightScreenCaptureAccess()
         await beginSession()
+    }
+
+    static func openSettings() {
+        NSWorkspace.shared.open(URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
     }
 
     func load(_ id: CGWindowID) async {

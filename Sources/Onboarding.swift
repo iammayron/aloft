@@ -49,7 +49,7 @@ enum Step: Int, CaseIterable {
 }
 
 struct OnboardingView: View {
-    static let size = CGSize(width: 540, height: 448)
+    static let size = CGSize(width: 540, height: 466)
 
     @ObservedObject var settings: Settings
     @ObservedObject var windows: WindowList
@@ -134,10 +134,8 @@ struct OnboardingView: View {
                 if AX.isTrusted {
                     grantedLabel("Accessibility granted")
                 } else {
-                    primary("Open Privacy Settings") {
-                        AX.requestTrust()
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-                    }
+                    primary("Grant Access") { AX.requestTrust() }
+                    secondary("Open Privacy Settings instead") { AX.openSettings() }
                     waitingLabel("Waiting for permission…")
                 }
 
@@ -148,6 +146,7 @@ struct OnboardingView: View {
                     primary("Enable Previews") {
                         Task { await thumbnails.requestAccess() }
                     }
+                    secondary("Open Privacy Settings instead") { Thumbnails.openSettings() }
                     secondary("Skip — use app icons") { advance() }
                 }
 
@@ -185,7 +184,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(height: step == .menuBar ? 148 : 92)
+        .frame(height: step == .menuBar ? 148 : 116)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
     }
 
