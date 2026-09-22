@@ -16,11 +16,35 @@ struct PanelView: View {
             header
             Divider().opacity(0.5)
 
-            if windows.trusted {
+            if !windows.trusted {
+                requestCard(
+                    title: "Accessibility access needed",
+                    body: "Aloft reads the list of open windows and keeps the pinned ones raised. It never types or clicks for you.",
+                    button: "Grant Access") {
+                        if settings.askedAccessibility {
+                            AX.openSettings()
+                        } else {
+                            settings.askedAccessibility = true
+                            AX.requestTrust()
+                        }
+                    }
+            } else if !thumbnails.granted {
+                // Previews are part of the picker, not a bonus on top of it. Falling
+                // back to a grid of app icons is worse than asking for the permission.
+                requestCard(
+                    title: "Screen Recording turned off",
+                    body: "Aloft shows a live preview of every window so you can pick the one you mean. Turn it back on to use the picker.",
+                    button: "Enable Previews") {
+                        if settings.askedScreenRecording {
+                            Thumbnails.openSettings()
+                        } else {
+                            settings.askedScreenRecording = true
+                            Task { await thumbnails.requestAccess() }
+                        }
+                    }
+            } else {
                 search
                 grid
-            } else {
-                permissionRequest
             }
 
             Divider().opacity(0.5)
@@ -42,13 +66,13 @@ struct PanelView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tint)
             Text("Aloft").font(.headline)
-            if !windows.pinned.isEmpty {
+            if ready, !windows.pinned.isEmpty {
                 Text("\(windows.pinned.count) pinned")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if !windows.pinned.isEmpty {
+            if ready, !windows.pinned.isEmpty {
                 Button("Unpin All") { windows.unpinAll() }
                     .buttonStyle(.glass)
                     .controlSize(.small)
@@ -139,45 +163,30 @@ struct PanelView: View {
 
     // MARK: - Permission
 
-    private var permissionRequest: some View {
+    private var ready: Bool { windows.trusted && thumbnails.granted }
+
+    private func requestCard(title: String, body: String, button: String,
+                             action: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Accessibility access needed")
+            Text(title)
                 .font(.system(size: 12, weight: .semibold))
-            Text("Aloft reads the list of open windows and keeps the pinned ones raised. It never types or clicks for you.")
+            Text(body)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Open Privacy Settings") {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.small)
+            Button(button, action: action)
+                .buttonStyle(.glassProminent)
+                .controlSize(.small)
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Footer
 
     private var footer: some View {
         HStack(spacing: 6) {
-            if windows.trusted && !thumbnails.granted {
-                Button {
-                    if settings.askedScreenRecording {
-                        Thumbnails.openSettings()
-                    } else {
-                        settings.askedScreenRecording = true
-                        Task { await thumbnails.requestAccess() }
-                    }
-                } label: {
-                    Label("Show previews", systemImage: "photo.on.rectangle")
-                }
-                .buttonStyle(.glass)
-                .controlSize(.small)
-                .help("Screen Recording lets Aloft draw live window previews. Pinning works without it.")
-                .contextMenu {
-                    Button("Open Privacy Settings") { Thumbnails.openSettings() }
-                }
-            } else {
+            if ready {
                 Text("Pin frontmost")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
