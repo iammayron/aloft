@@ -39,7 +39,7 @@ enum Step: Int, CaseIterable {
         case .shortcut:
             "This pins whichever window you're looking at, from anywhere. Click the key combination to change it."
         case .firstPin:
-            "Click any other window to focus it, then press your shortcut. A blue pin marker appears in its title bar, top right."
+            "Click any other window to focus it, then press your shortcut. The menu bar pin fills in once something is pinned."
         case .menuBar:
             "Open it to pin from a grid of live previews, and to do everything below."
         case .done:

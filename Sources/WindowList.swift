@@ -25,17 +25,11 @@ final class WindowList: ObservableObject {
     @Published private(set) var pinned: Set<CGWindowID> = []
     @Published private(set) var trusted = AX.isTrusted
 
-    let badges = PinBadges()
-
     private let log = Logger(subsystem: "dev.mayron.aloft", category: "scan")
     private var entries: [CGWindowID: WindowEntry] = [:]
     private var timer: Timer?
 
     init() {
-        badges.onUnpin = { [weak self] id in
-            guard let self, let entry = self.entries[id] else { return }
-            self.toggle(entry)
-        }
         timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
@@ -87,7 +81,6 @@ final class WindowList: ObservableObject {
         windows = found.sorted { ($0.appName, $0.title) < ($1.appName, $1.title) }
         for entry in found { entries[entry.id] = entry }
         pinned.formIntersection(Set(found.map(\.id)))   // drop pins whose window is gone
-        badges.sync(pinned: pinned, entries: entries)
     }
 
     // MARK: - Pinning
@@ -100,13 +93,9 @@ final class WindowList: ObservableObject {
             pinned.insert(entry.id)
             AX.raise(entry.element)
         }
-        badges.sync(pinned: pinned, entries: entries)
     }
 
-    func unpinAll() {
-        pinned.removeAll()
-        badges.removeAll()
-    }
+    func unpinAll() { pinned.removeAll() }
 
     func toggleFrontmost() { if let entry = frontmost() { toggle(entry) } }
 
@@ -131,14 +120,6 @@ final class WindowList: ObservableObject {
                   let frame = CGRect(dictionaryRepresentation: raw as CFDictionary)
             else { return nil }
             return (id, frame)
-        }
-
-        let onScreen = Set(visible.map(\.id))
-        for id in pinned {
-            // A badge floating over whatever replaced its window would be worse than
-            // no badge, so it tracks the window's presence, not just its frame.
-            badges.setVisible(id, onScreen.contains(id))
-            badges.reposition(id)
         }
 
         for id in Self.covered(pinned, in: visible) {
