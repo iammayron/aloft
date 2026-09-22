@@ -19,7 +19,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// real size and silently anchors anything that trusts it to the bottom-left of
     /// the screen.
     var buttonFrame: CGRect? {
-        guard let frame = item?.button?.window?.frame, frame.width > 0, frame.height > 0,
+        // The status window is wider than the icon it holds, so its midX is not the
+        // icon's centre. Convert the button's own bounds instead. And before the item
+        // is placed the window reports a (0,0) origin, a real rect with a real size
+        // that silently anchors anything trusting it to the bottom of the screen.
+        guard let button = item?.button, let window = button.window else { return nil }
+        let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
+        guard frame.width > 0, frame.height > 0,
               let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }),
               frame.maxY > screen.visibleFrame.maxY        // inside the menu bar strip
         else { return nil }

@@ -2,36 +2,28 @@ import AppKit
 import SwiftUI
 import os
 
-/// A pointer that parks itself under something the user needs to look at.
-/// Used for anything the flow asks for but cannot click on the user's behalf: the
-/// menu bar icon arriving in a bar that may already hold twenty others, or the pin
-/// marker appearing in a title bar they have never had reason to look at.
+/// A pointer that parks itself under something the user needs to look at, and stays
+/// until they act on it.
 @MainActor
 final class Coachmark {
     private var panel: NSPanel?
+    private var host: NSHostingView<NudgeView>?
+    private var anchor: (() -> CGRect?)?
+    private var text = ""
     private let log = Logger(subsystem: "dev.mayron.aloft", category: "nudge")
 
-    /// Anchors are in screen (Cocoa) coordinates: centre x, and the y the mark hangs
-    /// below. `seconds: 0` keeps it up until the user acts, which is what a mark
-    /// asking for a click needs.
-    func show(_ text: String, symbol: String = "pin.fill", centerX: CGFloat, below y: CGFloat,
-              seconds: Double = 0) {
-        dismiss()
-        present(text: text, symbol: symbol, centerX: centerX, below: y, seconds: seconds)
-    }
+    private static let size = NSSize(width: 250, height: 58)
 
-    /// The status item does not exist the instant the scene inserts it, so this polls
-    /// briefly for it rather than firing into an empty menu bar.
-    func showAtMenuBar(_ text: String) {
-        Task {
-            for attempt in 0..<12 {
-                if let item = Self.statusItemFrame(),
-                   let screen = NSScreen.screens.first(where: { $0.frame.intersects(item) })
-                    ?? NSScreen.main {
-                    show(text, centerX: item.midX, below: screen.visibleFrame.maxY)
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(attempt < 4 ? 120 : 400))
+    /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
+    /// app adds or drops one, and a mark measured once drifts off its target.
+    func follow(_ text: String, anchor: @escaping () -> CGRect?) {
+        self.text = text
+        self.anchor = anchor
+        guard place() else { return }
+        Task { @MainActor in
+            while panel != nil {
+                try? await Task.sleep(for: .milliseconds(900))
+                _ = place()
             }
         }
     }
@@ -39,34 +31,37 @@ final class Coachmark {
     func dismiss() {
         panel?.close()
         panel = nil
+        host = nil
+        anchor = nil
     }
 
-    private func present(text: String, symbol: String, centerX: CGFloat, below y: CGFloat,
-                         seconds: Double) {
-        // The anchor decides the screen. NSScreen.main is whichever screen holds the
-        // focused window, so on a second display it clamps the mark to the wrong one
-        // and the arrow ends up pointing at nothing.
-        let anchor = NSPoint(x: centerX, y: y - 1)
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) })
-            ?? NSScreen.main else {
-            log.error("no screen contains anchor \(centerX, privacy: .public),\(y, privacy: .public)")
-            return
+    @discardableResult
+    private func place() -> Bool {
+        guard let target = anchor?() else { return false }
+
+        let point = NSPoint(x: target.midX, y: target.minY - 1)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) else {
+            log.error("no screen at \(target.midX, privacy: .public),\(target.minY, privacy: .public)")
+            return false
         }
 
-        let size = NSSize(width: 268, height: 74)
-        let originX = min(max(centerX - size.width / 2, screen.visibleFrame.minX + 8),
-                          screen.visibleFrame.maxX - size.width - 8)
-        // When the screen edge pushes the capsule off its anchor, the arrow slides
-        // inside it instead. This has to be known before the view is built.
-        let reach = size.width / 2 - 26
-        let arrowOffset = min(max(centerX - (originX + size.width / 2), -reach), reach)
-        let origin = NSPoint(x: originX, y: y - size.height)
-        guard screen.frame.contains(NSPoint(x: origin.x + size.width / 2,
-                                            y: origin.y + size.height - 2)) else {
-            log.error("refusing off-screen mark at \(origin.x, privacy: .public),\(origin.y, privacy: .public)")
-            return
+        let size = Self.size
+        let originX = min(max(target.midX - size.width / 2, screen.frame.minX + 6),
+                          screen.frame.maxX - size.width - 6)
+        // Where the screen edge pushes the bubble off its target, the pointer slides
+        // along it instead. Must be known before the view is built.
+        let reach = size.width / 2 - 24
+        let arrow = min(max(target.midX - (originX + size.width / 2), -reach), reach)
+        let origin = NSPoint(x: originX, y: target.minY - size.height)
+
+        if let panel, let host {
+            host.rootView = NudgeView(text: text, arrowOffset: arrow) { [weak self] in self?.dismiss() }
+            panel.setFrameOrigin(origin)
+            return true
         }
 
+        let view = NudgeView(text: text, arrowOffset: arrow) { [weak self] in self?.dismiss() }
+        let host = NSHostingView(rootView: view)
         let window = NSPanel(contentRect: NSRect(origin: origin, size: size),
                              styleMask: [.nonactivatingPanel, .borderless],
                              backing: .buffered, defer: false)
@@ -78,86 +73,78 @@ final class Coachmark {
         window.isOpaque = false
         window.hasShadow = false
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: NudgeView(
-            text: text, symbol: symbol, arrowOffset: arrowOffset) { [weak self] in self?.dismiss() })
+        window.contentView = host
         window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         panel = window
+        self.host = host
 
-        log.info("mark at \(origin.x, privacy: .public),\(origin.y, privacy: .public) arrow \(arrowOffset, privacy: .public) screen \(screen.frame.debugDescription, privacy: .public)")
-
-        // seconds <= 0 means it stays until the user acts on it.
-        guard seconds > 0 else { return }
-        Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            dismiss()
-        }
+        log.info("mark at \(origin.x, privacy: .public),\(origin.y, privacy: .public) arrow \(arrow, privacy: .public) target \(target.debugDescription, privacy: .public)")
+        return true
     }
+}
 
-    /// Our own status item is the only window this process owns at the status layer.
-    private static func statusItemFrame() -> CGRect? {
-        let pid = ProcessInfo.processInfo.processIdentifier
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .optionIncludingWindow],
-                                                    kCGNullWindowID) as? [[String: Any]]
-            ?? CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
-        else { return nil }
+/// Capsule and pointer as a single path, so the glass is continuous across both.
+/// Drawn as two shapes they read as a blue triangle sitting near a grey pill.
+private struct Bubble: Shape {
+    var arrowOffset: CGFloat
 
-        for info in list {
-            guard (info[kCGWindowOwnerPID as String] as? pid_t) == pid,
-                  (info[kCGWindowLayer as String] as? Int) == 25,
-                  let raw = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let frame = CGRect(dictionaryRepresentation: raw as CFDictionary),
-                  frame.width < 200, frame.height < 40
-            else { continue }
-            return frame
-        }
-        return nil
+    static let arrowHeight: CGFloat = 8
+    static let arrowWidth: CGFloat = 17
+
+    func path(in rect: CGRect) -> Path {
+        let body = CGRect(x: rect.minX, y: rect.minY + Self.arrowHeight,
+                          width: rect.width, height: rect.height - Self.arrowHeight)
+        var path = Path(roundedRect: body, cornerRadius: body.height / 2, style: .continuous)
+
+        let tip = min(max(rect.midX + arrowOffset, body.minX + Self.arrowWidth),
+                      body.maxX - Self.arrowWidth)
+        path.move(to: CGPoint(x: tip - Self.arrowWidth / 2, y: body.minY + 2))
+        path.addLine(to: CGPoint(x: tip, y: rect.minY))
+        path.addLine(to: CGPoint(x: tip + Self.arrowWidth / 2, y: body.minY + 2))
+        path.closeSubpath()
+        return path
     }
 }
 
 private struct NudgeView: View {
     let text: String
-    let symbol: String
     let arrowOffset: CGFloat
     let dismiss: () -> Void
+
     @State private var arrived = false
-    @State private var bouncing = false
+    @State private var bobbing = false
 
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "arrowtriangle.up.fill")
-                .font(.system(size: 13))
-                .foregroundStyle(.tint)
-                .offset(x: arrowOffset)
+        let bubble = Bubble(arrowOffset: arrowOffset)
 
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tint)
-                Text(text)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
-            // Glass takes on whatever is behind the window, so the label carries its
-            // own legibility rather than trusting one frame of the desktop.
-            .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
-            .shadow(color: .black.opacity(0.3), radius: 9, y: 2)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .glassEffect(.regular, in: .capsule)
-            .clipShape(.capsule)
-            .shadow(color: .black.opacity(0.22), radius: 11, y: 3)
+        HStack(spacing: 8) {
+            Image(systemName: "pin.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.tint)
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
         }
-        .padding(.top, 2)
-        // The whole mark bobs, not just the arrowhead: movement at this size reads
-        // from the corner of the eye, a 4pt twitch does not.
-        .offset(y: bouncing ? -7 : 3)
-        .animation(.easeInOut(duration: 0.66).repeatForever(autoreverses: true), value: bouncing)
-        .scaleEffect(arrived ? 1 : 0.7)
+        // Glass takes on whatever is behind the window, so the label carries its own
+        // legibility rather than trusting one frame of the desktop.
+        .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+        .shadow(color: .black.opacity(0.3), radius: 9, y: 2)
+        .padding(.horizontal, 14)
+        .padding(.top, Bubble.arrowHeight + 9)
+        .padding(.bottom, 9)
+        .frame(maxWidth: .infinity)
+        .glassEffect(.regular, in: bubble)
+        .clipShape(bubble)
+        .shadow(color: .black.opacity(0.24), radius: 10, y: 3)
+        // Bobs downward only: the tip should stay against the menu bar, not lift off it.
+        .offset(y: bobbing ? 5 : 0)
+        .animation(.easeInOut(duration: 0.68).repeatForever(autoreverses: true), value: bobbing)
+        .scaleEffect(arrived ? 1 : 0.8, anchor: .top)
         .opacity(arrived ? 1 : 0)
-        .animation(.spring(response: 0.42, dampingFraction: 0.62), value: arrived)
+        .animation(.spring(response: 0.4, dampingFraction: 0.68), value: arrived)
         .contentShape(.rect)
         .onTapGesture(perform: dismiss)
-        .onAppear { arrived = true; bouncing = true }
+        .onAppear { arrived = true; bobbing = true }
     }
 }

@@ -109,6 +109,7 @@ struct PanelView: View {
         .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: 7))
         .padding(.horizontal, 12)
         .padding(.top, 10)
+        .padding(.bottom, 8)     // breathing room before the first row of previews
     }
 
     private var filtered: [WindowEntry] {
