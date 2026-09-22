@@ -12,6 +12,7 @@ final class Updater: ObservableObject {
     enum Phase: Equatable {
         case idle
         case checking
+        case upToDate
         case available(String)
         case downloading
         case installing
@@ -62,13 +63,29 @@ final class Updater: ObservableObject {
 
             if Self.isNewer(version, than: Self.current), downloadURL != nil {
                 phase = .available(version)
+            } else if manual {
+                // A manual check that finds nothing has to say so, or the button looks
+                // broken. It clears itself so the panel does not keep the notice.
+                phase = .upToDate
+                log.info("up to date at \(Self.current, privacy: .public)")
+                clearNotice(after: .seconds(6))
             } else {
                 phase = .idle
-                if manual { log.info("up to date at \(Self.current, privacy: .public)") }
             }
         } catch {
             log.error("check failed: \(String(describing: error), privacy: .public)")
             phase = manual ? .failed("Could not reach GitHub") : .idle
+            if manual { clearNotice(after: .seconds(8)) }
+        }
+    }
+
+    private func clearNotice(after delay: Duration) {
+        Task { @MainActor in
+            try? await Task.sleep(for: delay)
+            switch phase {
+            case .upToDate, .failed: phase = .idle
+            default: break
+            }
         }
     }
 

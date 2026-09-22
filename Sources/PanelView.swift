@@ -56,6 +56,7 @@ struct PanelView: View {
             }
 
             updateBanner
+                .animation(.spring(response: 0.32, dampingFraction: 0.85), value: updater.phase)
             Divider().opacity(0.5)
             footer
         }
@@ -230,6 +231,18 @@ struct PanelView: View {
                     .buttonStyle(.glassProminent)
                     .controlSize(.small)
             }
+        case .checking:
+            bannerRow {
+                ProgressView().controlSize(.small).scaleEffect(0.7)
+                Text("Checking for updates…")
+                Spacer()
+            }
+        case .upToDate:
+            bannerRow {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("Aloft \(Updater.current) is the latest version")
+                Spacer()
+            }
         case .downloading, .installing:
             bannerRow {
                 ProgressView().controlSize(.small).scaleEffect(0.7)
@@ -242,7 +255,7 @@ struct PanelView: View {
                 Text(reason)
                 Spacer()
             }
-        case .idle, .checking:
+        case .idle:
             EmptyView()
         }
     }
