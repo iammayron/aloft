@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
     private let coachmark = Coachmark()
     private let statusItem = StatusItemController()
+    private var explainedBadge = false
 
     private var onboarding: NSWindow?
     private var intro: NSWindow?
@@ -175,10 +176,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 statusItem.setPinning(pinning)
                 // First pin during onboarding: point at the marker it just produced,
                 // or the user never learns what that dot in the title bar means.
-                if !settings.onboarded, let first = value.first,
-                   let badge = windows.badges.frame(of: first) {
-                    coachmark.show("This marks a pinned window",
-                                   centerX: badge.midX, below: badge.minY, seconds: 7)
+                if !settings.onboarded, !explainedBadge, let first = value.first {
+                    explainedBadge = true
+                    Task { @MainActor in
+                        // The badge panel is created and placed as part of this same
+                        // change, so read its frame on the next turn, not this one.
+                        try? await Task.sleep(for: .milliseconds(260))
+                        guard let badge = windows.badges.frame(of: first) else { return }
+                        coachmark.show("This marks a pinned window",
+                                       centerX: badge.midX, below: badge.minY, seconds: 8)
+                    }
                 }
             }
         }

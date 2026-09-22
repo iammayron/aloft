@@ -22,7 +22,9 @@ final class Coachmark {
     func showAtMenuBar(_ text: String) {
         Task {
             for attempt in 0..<12 {
-                if let item = Self.statusItemFrame(), let screen = NSScreen.main {
+                if let item = Self.statusItemFrame(),
+                   let screen = NSScreen.screens.first(where: { $0.frame.intersects(item) })
+                    ?? NSScreen.main {
                     show(text, centerX: item.midX, below: screen.visibleFrame.maxY)
                     return
                 }
@@ -38,7 +40,12 @@ final class Coachmark {
 
     private func present(text: String, symbol: String, centerX: CGFloat, below y: CGFloat,
                          seconds: Double) {
-        guard let screen = NSScreen.main else { return }
+        // The anchor decides the screen. NSScreen.main is whichever screen holds the
+        // focused window, so on a second display it clamps the mark to the wrong one
+        // and the arrow ends up pointing at nothing.
+        let anchor = NSPoint(x: centerX, y: y - 1)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) })
+            ?? NSScreen.main else { return }
         let size = NSSize(width: 268, height: 78)
         var arrowOffset: CGFloat = 0
         let window = NSPanel(contentRect: NSRect(origin: .zero, size: size),
