@@ -13,6 +13,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var item: NSStatusItem?
     private let popover = NSPopover()
     var onOpen: (() -> Void)?
+    var onClose: (() -> Void)?
 
     /// Only once the status item has actually been placed in the menu bar. Straight
     /// after creation its window reports a (0,0) origin, which is a real rect with a
@@ -66,4 +67,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     func close() { popover.performClose(nil) }
+
+    func popoverDidClose(_ notification: Notification) { onClose?() }
 }

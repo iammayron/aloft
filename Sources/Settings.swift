@@ -86,6 +86,10 @@ final class Settings: ObservableObject {
     /// user found it. Deliberately not persisted — it only matters within a run.
     @Published var panelSeen = false
 
+    /// Bumped when the panel closes. A reused hosting controller keeps its SwiftUI
+    /// state, so a half-typed search would still be there the next time it opens.
+    @Published var panelClosed = 0
+
     private let defaults = UserDefaults.standard
 
     init() {

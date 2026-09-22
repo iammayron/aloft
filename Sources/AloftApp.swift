@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
     private func installStatusItem() {
         statusItem.onOpen = { [weak self] in self?.coachmark.dismiss() }
+        statusItem.onClose = { [weak self] in self?.settings.panelClosed += 1 }
         statusItem.install { [self] in
             PanelView(windows: windows, thumbnails: thumbnails, settings: settings)
         }

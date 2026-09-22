@@ -51,8 +51,11 @@ struct PanelView: View {
             footer
         }
         .frame(width: 452)
+        .onChange(of: settings.panelClosed) { query = "" }
         .task {
             settings.panelSeen = true
+            query = ""
+
             windows.refresh()
             await thumbnails.beginSession()
         }
