@@ -135,23 +135,34 @@ struct OnboardingView: View {
                 if AX.isTrusted {
                     grantedLabel("Accessibility granted")
                 } else {
-                    // Straight to Settings, no system dialog. Aloft is already listed
-                    // there: every refresh attempts an AX call, and a denied attempt is
-                    // what puts an app in the Accessibility list.
-                    primary("Open Privacy Settings") { AX.openSettings() }
-                    waitingLabel("Waiting for permission…")
+                    primary("Grant Access") {
+                        if settings.askedAccessibility {
+                            AX.openSettings()
+                        } else {
+                            settings.askedAccessibility = true
+                            AX.requestTrust()
+                        }
+                    }
+                    waitingLabel(settings.askedAccessibility
+                                 ? "Enable Aloft in the list, then come back"
+                                 : "Waiting for permission…")
                 }
 
             case .previews:
                 if thumbnails.granted {
                     grantedLabel("Screen Recording granted")
                 } else {
-                    // Screen Recording is the other way round: nothing lists an app
-                    // there until it asks, so the system prompt has to be the action.
                     primary("Enable Previews") {
-                        Task { await thumbnails.requestAccess() }
+                        if settings.askedScreenRecording {
+                            Thumbnails.openSettings()
+                        } else {
+                            settings.askedScreenRecording = true
+                            Task { await thumbnails.requestAccess() }
+                        }
                     }
-                    waitingLabel("Waiting for permission…")
+                    waitingLabel(settings.askedScreenRecording
+                                 ? "Enable Aloft in the list, then come back"
+                                 : "Waiting for permission…")
                 }
 
             case .shortcut:

@@ -42,6 +42,12 @@ final class Settings: ObservableObject {
     @Published var soundsEnabled: Bool { didSet { defaults.set(soundsEnabled, forKey: "sounds") } }
     @Published var onboarded: Bool { didSet { defaults.set(onboarded, forKey: "onboarded") } }
 
+    /// macOS shows each permission dialog once. After that the call is silent, so a
+    /// button wired to it would look dead — these record that the ask has been spent
+    /// and the button should fall back to opening System Settings.
+    @Published var askedAccessibility: Bool { didSet { defaults.set(askedAccessibility, forKey: "askedAX") } }
+    @Published var askedScreenRecording: Bool { didSet { defaults.set(askedScreenRecording, forKey: "askedSC") } }
+
     /// Set when the menu-bar panel is first opened, so onboarding can tell that the
     /// user found it. Deliberately not persisted — it only matters within a run.
     @Published var panelSeen = false
@@ -52,6 +58,8 @@ final class Settings: ObservableObject {
         shortcut = Settings.read(Shortcut.self, "shortcut", from: defaults) ?? .fallback
         soundsEnabled = defaults.object(forKey: "sounds") as? Bool ?? true
         onboarded = defaults.bool(forKey: "onboarded")
+        askedAccessibility = defaults.bool(forKey: "askedAX")
+        askedScreenRecording = defaults.bool(forKey: "askedSC")
     }
 
     private func write<T: Encodable>(_ value: T, _ key: String) {

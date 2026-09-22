@@ -162,7 +162,12 @@ struct PanelView: View {
         HStack(spacing: 6) {
             if windows.trusted && !thumbnails.granted {
                 Button {
-                    Task { await thumbnails.requestAccess() }
+                    if settings.askedScreenRecording {
+                        Thumbnails.openSettings()
+                    } else {
+                        settings.askedScreenRecording = true
+                        Task { await thumbnails.requestAccess() }
+                    }
                 } label: {
                     Label("Show previews", systemImage: "photo.on.rectangle")
                 }
