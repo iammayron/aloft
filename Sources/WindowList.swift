@@ -128,13 +128,21 @@ final class WindowList: ObservableObject {
     }
 
     /// Pure z-order decision, split out so it can be exercised without a window server.
-    /// `stack` is front-to-back. A window is covered when any window ahead of it overlaps.
+    /// `stack` is front-to-back. A window needs raising when a window ahead of it
+    /// overlaps it.
+    ///
+    /// Other pinned windows do not count. Two overlapping pins would otherwise each
+    /// see the other in front and raise past it, swapping places every tick forever.
+    /// Pins settle into whatever order they already have and only climb above the
+    /// windows that are not pinned.
     static func covered(_ pinned: Set<CGWindowID>,
                         in stack: [(id: CGWindowID, frame: CGRect)]) -> [CGWindowID] {
         pinned.filter { id in
             guard let index = stack.firstIndex(where: { $0.id == id }) else { return false }
             let frame = stack[index].frame
-            return stack[..<index].contains { $0.frame.intersects(frame) }
+            return stack[..<index].contains {
+                !pinned.contains($0.id) && $0.frame.intersects(frame)
+            }
         }
     }
 

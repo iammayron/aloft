@@ -10,7 +10,9 @@ func covered(_ pinned: Set<CGWindowID>, in stack: [(id: CGWindowID, frame: CGRec
     pinned.filter { id in
         guard let index = stack.firstIndex(where: { $0.id == id }) else { return false }
         let frame = stack[index].frame
-        return stack[..<index].contains { $0.frame.intersects(frame) }
+        return stack[..<index].contains {
+            !pinned.contains($0.id) && $0.frame.intersects(frame)
+        }
     }
 }
 
@@ -23,5 +25,12 @@ assert(covered([2], in: [(1, a), (2, b)]) == [2])         // overlapping window 
 assert(covered([2], in: [(1, c), (2, b)]) == [])          // in front but disjoint
 assert(covered([99], in: [(1, a)]) == [])                 // other Space / minimised
 assert(Set(covered([2, 3], in: [(1, a), (2, b), (3, c)])) == [2])
+
+// Two pinned windows that overlap must not raise past each other: each would see the
+// other in front and they would swap places on every tick.
+assert(covered([1, 2], in: [(1, a), (2, b)]) == [])
+assert(covered([1, 2], in: [(2, b), (1, a)]) == [])
+// A window that is not pinned, in front of both, still lifts both.
+assert(Set(covered([2, 3], in: [(1, b), (2, a), (3, b)])) == [2, 3])
 
 print("occlusion: ok")
