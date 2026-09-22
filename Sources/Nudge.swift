@@ -12,7 +12,11 @@ final class Coachmark {
     private var text = ""
     private let log = Logger(subsystem: "dev.mayron.aloft", category: "nudge")
 
-    private static let size = NSSize(width: 250, height: 58)
+    /// The window is deliberately larger than the bubble: a window sized to its
+    /// content clips the bob and the shadow at its own edge.
+    private static let size = NSSize(width: 290, height: 82)
+    /// How far the tip rides up into the menu bar button.
+    private static let overlap: CGFloat = 5
 
     /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
     /// app adds or drops one, and a mark measured once drifts off its target.
@@ -52,7 +56,9 @@ final class Coachmark {
         // along it instead. Must be known before the view is built.
         let reach = size.width / 2 - 24
         let arrow = min(max(target.midX - (originX + size.width / 2), -reach), reach)
-        let origin = NSPoint(x: originX, y: target.minY - size.height)
+        // Content is pinned to the top of the window, so place the window such that
+        // the bubble's top edge lands just inside the button's bottom edge.
+        let origin = NSPoint(x: originX, y: target.minY + Self.overlap - size.height)
 
         if let panel, let host {
             host.rootView = NudgeView(text: text, arrowOffset: arrow) { [weak self] in self?.dismiss() }
@@ -116,9 +122,17 @@ private struct NudgeView: View {
     @State private var bobbing = false
 
     var body: some View {
-        let bubble = Bubble(arrowOffset: arrowOffset)
+        VStack(spacing: 0) {
+            bubble
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
 
-        HStack(spacing: 8) {
+    private var bubble: some View {
+        let shape = Bubble(arrowOffset: arrowOffset)
+
+        return HStack(spacing: 8) {
             Image(systemName: "pin.fill")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.tint)
@@ -133,12 +147,11 @@ private struct NudgeView: View {
         .padding(.horizontal, 14)
         .padding(.top, Bubble.arrowHeight + 9)
         .padding(.bottom, 9)
-        .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: bubble)
-        .clipShape(bubble)
+        .glassEffect(.regular, in: shape)
+        .clipShape(shape)
         .shadow(color: .black.opacity(0.24), radius: 10, y: 3)
         // Bobs downward only: the tip should stay against the menu bar, not lift off it.
-        .offset(y: bobbing ? 5 : 0)
+        .offset(y: bobbing ? 4 : 0)
         .animation(.easeInOut(duration: 0.68).repeatForever(autoreverses: true), value: bobbing)
         .scaleEffect(arrived ? 1 : 0.8, anchor: .top)
         .opacity(arrived ? 1 : 0)
