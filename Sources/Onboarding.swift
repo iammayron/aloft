@@ -57,9 +57,19 @@ struct OnboardingView: View {
     let unlockMenuBar: () -> Void
     let finish: () -> Void
 
-    @State private var step: Step = .welcome
+    @State private var step: Step
     @State private var celebrating = false
     @State private var entered = false
+
+    init(settings: Settings, windows: WindowList, thumbnails: Thumbnails,
+         unlockMenuBar: @escaping () -> Void, finish: @escaping () -> Void) {
+        self.settings = settings
+        self.windows = windows
+        self.thumbnails = thumbnails
+        self.unlockMenuBar = unlockMenuBar
+        self.finish = finish
+        _step = State(initialValue: Step(rawValue: settings.step) ?? .welcome)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -286,15 +296,18 @@ struct OnboardingView: View {
         withAnimation { celebrating = true }
         try? await Task.sleep(for: .milliseconds(900))
         withAnimation { celebrating = false }
-        advance()
+        // No step chime here: the grant chime already marked this move, and a second
+        // sound with nothing on screen to explain it reads as an error.
+        advance(chime: nil)
     }
 
-    private func advance() {
+    private func advance(chime: Chime? = .step) {
         guard let next = Step(rawValue: step.rawValue + 1) else { return }
         // The menu-bar step asks the user to open the panel, so the icon has to exist
         // by the time they get there.
         if next == .menuBar { unlockMenuBar() }
-        Chime.step.play(if: settings.soundsEnabled)
+        settings.step = next.rawValue
+        chime?.play(if: settings.soundsEnabled)
         withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) { step = next }
     }
 }

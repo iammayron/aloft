@@ -48,6 +48,10 @@ final class Settings: ObservableObject {
     @Published var askedAccessibility: Bool { didSet { defaults.set(askedAccessibility, forKey: "askedAX") } }
     @Published var askedScreenRecording: Bool { didSet { defaults.set(askedScreenRecording, forKey: "askedSC") } }
 
+    /// Granting Screen Recording makes macOS offer "Quit & Reopen", so onboarding has
+    /// to survive its own process dying and pick up where it left off.
+    @Published var step: Int { didSet { defaults.set(step, forKey: "step") } }
+
     /// Set when the menu-bar panel is first opened, so onboarding can tell that the
     /// user found it. Deliberately not persisted — it only matters within a run.
     @Published var panelSeen = false
@@ -60,6 +64,7 @@ final class Settings: ObservableObject {
         onboarded = defaults.bool(forKey: "onboarded")
         askedAccessibility = defaults.bool(forKey: "askedAX")
         askedScreenRecording = defaults.bool(forKey: "askedSC")
+        step = defaults.integer(forKey: "step")
     }
 
     private func write<T: Encodable>(_ value: T, _ key: String) {
@@ -76,7 +81,7 @@ final class Settings: ObservableObject {
 
 enum Chime: String {
     case intro = "Submarine"
-    case step = "Tink"
+    case step = "Pop"
     case granted = "Glass"
     case finished = "Hero"
 

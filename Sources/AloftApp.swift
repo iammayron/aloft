@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             unlockMenuBar: { [weak self] in self?.menuBarReady = true },
             finish: { [weak self] in
                 self?.settings.onboarded = true
+                self?.settings.step = 0
                 self?.onboarding?.close()
                 self?.onboarding = nil
             }))
@@ -94,11 +95,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     }
 
     /// Closing onboarding early must not strand the app with no menu bar icon and no
-    /// window — that would leave no way to use or quit it.
+    /// window — that would leave no way to use or quit it. It must also not count as
+    /// finishing: macOS closes this window when the user takes "Quit & Reopen" from
+    /// the Screen Recording prompt, and that is the middle of onboarding, not the end.
     func windowWillClose(_ notification: Notification) {
         guard (notification.object as? NSWindow) === onboarding else { return }
         onboarding = nil
-        settings.onboarded = true
         menuBarReady = true
     }
 
@@ -108,7 +110,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             menuBarReady = true
             if !AX.isTrusted { AX.requestTrust() }
         } else {
-            showIntro()
+            if settings.step >= Step.menuBar.rawValue { menuBarReady = true }
+            // Resuming mid-flow should not replay the title card.
+            settings.step == 0 ? showIntro() : showOnboarding()
         }
 
         // Only warm previews when the permission already exists: SCShareableContent is
