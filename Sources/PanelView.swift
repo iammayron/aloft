@@ -4,6 +4,7 @@ import SwiftUI
 struct PanelView: View {
     @ObservedObject var windows: WindowList
     @ObservedObject var thumbnails: Thumbnails
+    @ObservedObject var settings: Settings
     @State private var query = ""
 
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 2)
@@ -66,7 +67,18 @@ struct PanelView: View {
             TextField("Search windows", text: $query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+                .transition(.opacity.combined(with: .scale(scale: 0.7)))
+            }
         }
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: query.isEmpty)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: 7))
@@ -160,11 +172,8 @@ struct PanelView: View {
                 Text("Pin frontmost")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                Text("⌃⌘T")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5).padding(.vertical, 2)
-                    .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 4))
+                ShortcutRecorder(shortcut: $settings.shortcut)
+                    .controlSize(.mini)
             }
             Spacer()
             Button("Quit") { NSApp.terminate(nil) }
