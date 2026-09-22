@@ -84,6 +84,8 @@ enum Chime: String {
 
 struct ShortcutRecorder: View {
     @Binding var shortcut: Shortcut
+    var compact = false
+
     @State private var recording = false
     @State private var monitor: Any?
     @State private var rejected = false
@@ -92,14 +94,22 @@ struct ShortcutRecorder: View {
         Button {
             recording ? stop() : start()
         } label: {
-            Text(recording ? "Press keys…" : shortcut.display)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .monospaced()
-                .frame(minWidth: 96)
-                .contentTransition(.numericText())
+            Group {
+                if recording {
+                    Text("Press keys…")
+                } else {
+                    // Kerning pushes trailing space after the last glyph; the negative
+                    // trailing padding takes it back so the text stays centred.
+                    Text(shortcut.display)
+                        .kerning(kerning)
+                        .padding(.trailing, -kerning)
+                }
+            }
+            .font(.system(size: compact ? 11 : 13, weight: .semibold, design: .rounded))
+            .frame(minWidth: compact ? 54 : 88)
+            .contentTransition(.numericText())
         }
         .buttonStyle(.glass)
-        .controlSize(.large)
         .tint(recording ? .accentColor : nil)
         .overlay(alignment: .bottom) {
             if rejected {
@@ -115,6 +125,8 @@ struct ShortcutRecorder: View {
         .animation(.easeOut(duration: 0.2), value: rejected)
         .onDisappear(perform: stop)
     }
+
+    private var kerning: CGFloat { compact ? 2.5 : 3.5 }
 
     private func start() {
         recording = true

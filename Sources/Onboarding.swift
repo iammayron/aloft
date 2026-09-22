@@ -155,6 +155,7 @@ struct OnboardingView: View {
 
             case .shortcut:
                 ShortcutRecorder(shortcut: $settings.shortcut)
+                    .controlSize(.large)
                 primary("Continue") { advance() }
 
             case .menuBar:
