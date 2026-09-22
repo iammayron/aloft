@@ -34,12 +34,32 @@ struct Shortcut: Codable, Equatable {
     static func isUsable(_ flags: NSEvent.ModifierFlags) -> Bool {
         !flags.intersection([.control, .option, .command]).isEmpty
     }
+
+    /// Tried in order on first run. ⌃⌘T is the nicest to press but commonly taken, so
+    /// a fresh install lands on something that actually works rather than a default
+    /// that silently does nothing.
+    @MainActor
+    static func firstAvailable() -> Shortcut {
+        let candidates = [
+            Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .command]).rawValue, label: "T"),
+            Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "T"),
+            Shortcut(keyCode: 35, modifiers: NSEvent.ModifierFlags([.control, .option, .command]).rawValue, label: "P"),
+            Shortcut(keyCode: 17, modifiers: NSEvent.ModifierFlags([.shift, .control, .command]).rawValue, label: "T"),
+        ]
+        return candidates.first(where: HotKey.shared.isAvailable) ?? fallback
+    }
 }
 
 @MainActor
 final class Settings: ObservableObject {
     @Published var shortcut: Shortcut { didSet { write(shortcut, "shortcut") } }
     @Published var soundsEnabled: Bool { didSet { defaults.set(soundsEnabled, forKey: "sounds") } }
+    /// False when the stored shortcut could not be registered — something else owns
+    /// it now, perhaps since it was chosen.
+    @Published var shortcutActive = true
+
+    private(set) var hasStoredShortcut = false
+
     @Published var onboarded: Bool { didSet { defaults.set(onboarded, forKey: "onboarded") } }
 
     /// macOS shows each permission dialog once. After that the call is silent, so a
@@ -59,7 +79,9 @@ final class Settings: ObservableObject {
     private let defaults = UserDefaults.standard
 
     init() {
-        shortcut = Settings.read(Shortcut.self, "shortcut", from: defaults) ?? .fallback
+        let stored = Settings.read(Shortcut.self, "shortcut", from: defaults)
+        hasStoredShortcut = stored != nil
+        shortcut = stored ?? .fallback
         soundsEnabled = defaults.object(forKey: "sounds") as? Bool ?? true
         onboarded = defaults.bool(forKey: "onboarded")
         askedAccessibility = defaults.bool(forKey: "askedAX")
@@ -98,10 +120,13 @@ enum Chime: String {
 struct ShortcutRecorder: View {
     @Binding var shortcut: Shortcut
     var compact = false
+    var active = true
 
     @State private var recording = false
     @State private var monitor: Any?
-    @State private var rejected = false
+    @State private var problem: Problem?
+
+    private enum Problem { case needsModifier, taken }
 
     var body: some View {
         Button {
@@ -125,8 +150,9 @@ struct ShortcutRecorder: View {
         .buttonStyle(.glass)
         .tint(recording ? .accentColor : nil)
         .overlay(alignment: .bottom) {
-            if rejected {
-                Text("Needs ⌘, ⌃ or ⌥")
+            if let message = problem.map({ $0 == .taken ? "Already used by another app" : "Needs ⌘, ⌃ or ⌥" })
+                ?? (active ? nil : "Not active, in use by another app") {
+                Text(message)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fixedSize()
@@ -135,7 +161,8 @@ struct ShortcutRecorder: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: recording)
-        .animation(.easeOut(duration: 0.2), value: rejected)
+        .animation(.easeOut(duration: 0.2), value: problem)
+        .tint(active ? nil : .orange)
         .onDisappear(perform: stop)
     }
 
@@ -143,18 +170,23 @@ struct ShortcutRecorder: View {
 
     private func start() {
         recording = true
-        rejected = false
+        problem = nil
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53 { stop(); return nil }        // Escape cancels
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             guard Shortcut.isUsable(flags) else {
-                rejected = true
+                problem = .needsModifier
                 return nil
             }
-            shortcut = Shortcut(
+            let candidate = Shortcut(
                 keyCode: event.keyCode,
                 modifiers: flags.rawValue,
                 label: (event.charactersIgnoringModifiers ?? "?").uppercased())
+            guard HotKey.shared.isAvailable(candidate) else {
+                problem = .taken
+                return nil                                       // keep recording
+            }
+            shortcut = candidate
             stop()
             return nil                                           // never reaches the app
         }
@@ -162,7 +194,7 @@ struct ShortcutRecorder: View {
 
     private func stop() {
         recording = false
-        rejected = false
+        problem = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
     }

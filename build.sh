@@ -33,7 +33,7 @@ swiftc -O -parse-as-library \
   -target arm64-apple-macos26.0 \
   Sources/*.swift \
   -o "$APP/Contents/MacOS/Aloft" \
-  -framework AppKit -framework SwiftUI -framework ScreenCaptureKit -framework AVFoundation
+  -framework AppKit -framework SwiftUI -framework ScreenCaptureKit -framework AVFoundation -framework Carbon
 
 mkdir -p "$APP/Contents/Resources"
 xcrun actool AppIcon.icon --compile "$APP/Contents/Resources" --app-icon AppIcon \

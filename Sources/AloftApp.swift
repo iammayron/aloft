@@ -6,8 +6,12 @@ struct AloftApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        MenuBarExtra(isInserted: Binding(
-            get: { delegate.menuBarReady },
+        // Read the flag HERE, during body evaluation. Reading it inside the Binding's
+        // getter defers it past evaluation, so SwiftUI records no dependency and the
+        // scene never re-runs when it flips: the icon simply never appears.
+        let ready = delegate.menuBarReady
+        return MenuBarExtra(isInserted: Binding(
+            get: { ready },
             set: { delegate.menuBarReady = $0 })) {
             PanelView(windows: delegate.windows,
                       thumbnails: delegate.thumbnails,
@@ -25,9 +29,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     let thumbnails = Thumbnails()
     let settings = Settings()
     @Published var pinning = false
-    @Published var menuBarReady = false
+    @Published var menuBarReady = false {
+        didSet { if menuBarReady, !oldValue { coachmark.showAtMenuBar("Aloft lives up here") } }
+    }
 
-    private var monitor: Any?
+    private let coachmark = Coachmark()
+
     private var onboarding: NSWindow?
     private var intro: NSWindow?
 
@@ -122,16 +129,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             Task { await thumbnails.beginSession() }
         }
 
-        // ⌃⌘T mirrors whatever is frontmost. Only reacts to that one combination.
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            Task { @MainActor in
-                guard let self, self.settings.shortcut.matches(event) else { return }
-                self.windows.toggleFrontmost()
+        HotKey.shared.onPress = { [weak self] in self?.windows.toggleFrontmost() }
+        if !settings.hasStoredShortcut { settings.shortcut = Shortcut.firstAvailable() }
+        settings.shortcutActive = HotKey.shared.apply(settings.shortcut)
+
+        Task { @MainActor in
+            for await seen in settings.$panelSeen.values where seen { coachmark.dismiss() }
+        }
+
+        Task { @MainActor in
+            for await shortcut in settings.$shortcut.values {
+                settings.shortcutActive = HotKey.shared.apply(shortcut)
             }
         }
 
         Task { @MainActor in
-            for await value in windows.$pinned.values { pinning = !value.isEmpty }
+            for await value in windows.$pinned.values {
+                pinning = !value.isEmpty
+                // First pin during onboarding: point at the marker it just produced,
+                // or the user never learns what that dot in the title bar means.
+                if !settings.onboarded, let first = value.first,
+                   let badge = windows.badges.frame(of: first) {
+                    coachmark.show("This marks a pinned window",
+                                   centerX: badge.midX, below: badge.minY, seconds: 7)
+                }
+            }
         }
     }
 }

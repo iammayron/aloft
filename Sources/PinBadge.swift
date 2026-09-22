@@ -30,6 +30,8 @@ final class PinBadges {
 
     func reposition(_ id: CGWindowID) { badges[id]?.reposition() }
 
+    func frame(of id: CGWindowID) -> CGRect? { badges[id]?.frame }
+
     func remove(_ id: CGWindowID) {
         badges.removeValue(forKey: id)?.shutDown()
     }

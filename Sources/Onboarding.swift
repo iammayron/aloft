@@ -41,15 +41,15 @@ enum Step: Int, CaseIterable {
         case .firstPin:
             "Click any other window to focus it, then press your shortcut. A pin marker appears in its title bar."
         case .menuBar:
-            "Open it to pin from a grid of live previews — and to do everything below."
+            "Open it to pin from a grid of live previews, and to do everything below."
         case .done:
-            "Pin from the menu bar grid or with your shortcut — whichever is closer to hand."
+            "Pin from the menu bar grid or with your shortcut, whichever is closer to hand."
         }
     }
 }
 
 struct OnboardingView: View {
-    static let size = CGSize(width: 540, height: 448)
+    static let size = CGSize(width: 540, height: 470)
 
     @ObservedObject var settings: Settings
     @ObservedObject var windows: WindowList
@@ -176,18 +176,18 @@ struct OnboardingView: View {
                 }
 
             case .shortcut:
-                ShortcutRecorder(shortcut: $settings.shortcut)
+                ShortcutRecorder(shortcut: $settings.shortcut, active: settings.shortcutActive)
                     .controlSize(.large)
                 primary("Continue") { advance() }
 
             case .menuBar:
-                VStack(alignment: .leading, spacing: 9) {
+                VStack(spacing: 11) {
                     hint("pin", "Click the pin in your menu bar")
                     hint("square.grid.2x2", "Pick any window from the grid to pin it")
                     hint("keyboard", "Change your shortcut in the panel footer")
                     hint("power", "Quit Aloft from that same footer")
                 }
-                .frame(width: 330)
+                .padding(.bottom, 16)
                 waitingLabel("Open the menu bar panel to continue…")
 
             case .firstPin:
@@ -210,7 +210,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(height: step == .menuBar ? 148 : 98)
+        .frame(height: step == .menuBar ? 186 : 98)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
     }
 
@@ -228,10 +228,16 @@ struct OnboardingView: View {
 
     // MARK: - Pieces
 
+    /// Every step that waits on a click pulses the thing to click, so the eye lands
+    /// on the one control that moves the flow forward.
     private func primary(_ label: String, action: @escaping () -> Void) -> some View {
         Button(label, action: action)
             .buttonStyle(.glassProminent)
             .controlSize(.large)
+            .scaleEffect(entered ? 1.035 : 1)
+            .animation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true), value: entered)
+            .onAppear { entered = true }
+            .onDisappear { entered = false }
     }
 
     private func secondary(_ label: String, action: @escaping () -> Void) -> some View {
@@ -241,16 +247,15 @@ struct OnboardingView: View {
     }
 
     private func hint(_ symbol: String, _ text: String) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.tint)
-                .frame(width: 16)
             Text(text)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
         }
+        .fixedSize()
     }
 
     private func grantedLabel(_ text: String) -> some View {
