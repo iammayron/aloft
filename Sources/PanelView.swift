@@ -23,6 +23,10 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider().opacity(0.5)
+            // Directly under the menu that triggers it. Feedback at the far end of the
+            // panel reads as unrelated to the control you just clicked.
+            updateBanner
+                .animation(.spring(response: 0.32, dampingFraction: 0.85), value: updater.phase)
 
             if !windows.trusted {
                 requestCard(
@@ -55,8 +59,6 @@ struct PanelView: View {
                 grid
             }
 
-            updateBanner
-                .animation(.spring(response: 0.32, dampingFraction: 0.85), value: updater.phase)
             Divider().opacity(0.5)
             footer
         }
@@ -262,12 +264,13 @@ struct PanelView: View {
 
     private func bannerRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(spacing: 0) {
-            Divider().opacity(0.5)
             HStack(spacing: 7) { content() }
                 .font(.system(size: 11))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
+            Divider().opacity(0.5)
         }
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var footer: some View {
