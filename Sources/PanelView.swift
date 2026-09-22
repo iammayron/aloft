@@ -71,9 +71,6 @@ struct PanelView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tint)
             Text("Aloft").font(.headline)
-            Text(Updater.current)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.tertiary)
             if ready, !windows.pinned.isEmpty {
                 Text("\(windows.pinned.count) pinned")
                     .font(.system(size: 11))
