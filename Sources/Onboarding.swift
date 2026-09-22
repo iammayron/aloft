@@ -49,7 +49,7 @@ enum Step: Int, CaseIterable {
 }
 
 struct OnboardingView: View {
-    static let size = CGSize(width: 540, height: 466)
+    static let size = CGSize(width: 540, height: 448)
 
     @ObservedObject var settings: Settings
     @ObservedObject var windows: WindowList
@@ -134,8 +134,10 @@ struct OnboardingView: View {
                 if AX.isTrusted {
                     grantedLabel("Accessibility granted")
                 } else {
-                    primary("Grant Access") { AX.requestTrust() }
-                    secondary("Open Privacy Settings instead") { AX.openSettings() }
+                    // Straight to Settings, no system dialog. Aloft is already listed
+                    // there: every refresh attempts an AX call, and a denied attempt is
+                    // what puts an app in the Accessibility list.
+                    primary("Open Privacy Settings") { AX.openSettings() }
                     waitingLabel("Waiting for permission…")
                 }
 
@@ -143,10 +145,11 @@ struct OnboardingView: View {
                 if thumbnails.granted {
                     grantedLabel("Screen Recording granted")
                 } else {
+                    // Screen Recording is the other way round: nothing lists an app
+                    // there until it asks, so the system prompt has to be the action.
                     primary("Enable Previews") {
                         Task { await thumbnails.requestAccess() }
                     }
-                    secondary("Open Privacy Settings instead") { Thumbnails.openSettings() }
                     secondary("Skip — use app icons") { advance() }
                 }
 
@@ -184,7 +187,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(height: step == .menuBar ? 148 : 116)
+        .frame(height: step == .menuBar ? 148 : 98)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
     }
 
