@@ -31,7 +31,7 @@ enum Step: Int, CaseIterable {
     var body: String {
         switch self {
         case .welcome:
-            "Keep any window on top of the others. Pick it from a grid, or pin whatever you're looking at with one shortcut."
+            "Any window, always on top. Pick one from a grid of live previews, or pin whatever you're looking at with a single shortcut."
         case .accessibility:
             "Aloft needs Accessibility to list your open windows and to raise the ones you pin. It never types or clicks for you."
         case .previews:

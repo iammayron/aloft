@@ -12,6 +12,7 @@ struct IntroView: View {
 
     @State private var showMark = false
     @State private var showName = false
+    @State private var showTag = false
     @State private var leaving = false
 
     var body: some View {
@@ -91,8 +92,10 @@ struct IntroView: View {
 
     // MARK: - Mark
 
+    static let slogan = "Any window, always on top."
+
     private var mark: some View {
-        VStack(spacing: 26) {
+        VStack(spacing: 18) {
             if let icon = NSApp.applicationIconImage {
                 Image(nsImage: icon)
                     .resizable()
@@ -114,9 +117,21 @@ struct IntroView: View {
                 .opacity(showName ? 1 : 0)
                 .offset(y: showName ? 0 : 16)
                 .blur(radius: showName ? 0 : 10)
+                .padding(.top, 8)
+
+            Text(Self.slogan)
+                .font(.system(size: 21, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.82))
+                .kerning(0.2)
+                .shadow(color: .black.opacity(0.42), radius: 3, y: 1)
+                .shadow(color: .black.opacity(0.26), radius: 16, y: 4)
+                .opacity(showTag ? 1 : 0)
+                .offset(y: showTag ? 0 : 12)
+                .blur(radius: showTag ? 0 : 7)
         }
         .animation(.spring(response: 0.85, dampingFraction: 0.68), value: showMark)
         .animation(.spring(response: 0.70, dampingFraction: 0.80), value: showName)
+        .animation(.spring(response: 0.75, dampingFraction: 0.85), value: showTag)
     }
 
     // MARK: - Sequence
@@ -128,7 +143,9 @@ struct IntroView: View {
         Chime.intro.play(if: soundsEnabled)
         try? await Task.sleep(for: .milliseconds(430))
         showName = true
-        try? await Task.sleep(for: .milliseconds(1900))
+        try? await Task.sleep(for: .milliseconds(380))
+        showTag = true
+        try? await Task.sleep(for: .milliseconds(1850))
         exit()
     }
 
