@@ -148,9 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             settings.step == 0 ? showIntro() : showOnboarding()
         }
 
-        // Only warm previews when the permission already exists: SCShareableContent is
-        // what raises the TCC prompt, and an unexplained prompt at launch is exactly
-        // what the "Show previews" button is there to avoid.
+        // Only warm previews when the permission already exists. SCShareableContent is
+        // what raises the TCC prompt, and a prompt at launch, before anything has
+        // explained why, is the one place it should never appear.
         if CGPreflightScreenCaptureAccess() {
             Task { await thumbnails.beginSession() }
         }
