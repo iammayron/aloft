@@ -17,10 +17,10 @@ final class Coachmark {
     private static let size = NSSize(width: 290, height: 82)
     /// How far the tip rides up into the menu bar button.
     private static let overlap: CGFloat = 7
-    /// Optical trim on the arrow's x. Zero is the button rect's true centre, which is
-    /// also where the template image is drawn, so this should stay at zero unless the
-    /// glyph itself is visibly off-centre in its rect.
-    private static let horizontalTrim: CGFloat = 0
+    /// SwiftUI rounds the bubble's origin to a pixel boundary, so a bubble centred in
+    /// this window renders 1pt right of the window's own centre. Measured, not guessed:
+    /// the probe below logs the tip's real position against the anchor.
+    private static let horizontalTrim: CGFloat = -1
 
     /// `anchor` is re-read while the mark is up: menu bar items shift whenever another
     /// app adds or drops one, and a mark measured once drifts off its target.
@@ -154,7 +154,6 @@ private struct NudgeView: View {
         .padding(.bottom, 9)
         .glassEffect(.regular, in: shape)
         .clipShape(shape)
-        .shadow(color: .black.opacity(0.24), radius: 10, y: 3)
         // Bobs downward only: the tip should stay against the menu bar, not lift off it.
         .offset(y: bobbing ? 4 : 0)
         .animation(.easeInOut(duration: 0.68).repeatForever(autoreverses: true), value: bobbing)
