@@ -42,6 +42,10 @@ final class Settings: ObservableObject {
     @Published var soundsEnabled: Bool { didSet { defaults.set(soundsEnabled, forKey: "sounds") } }
     @Published var onboarded: Bool { didSet { defaults.set(onboarded, forKey: "onboarded") } }
 
+    /// Set when the menu-bar panel is first opened, so onboarding can tell that the
+    /// user found it. Deliberately not persisted — it only matters within a run.
+    @Published var panelSeen = false
+
     private let defaults = UserDefaults.standard
 
     init() {
@@ -63,6 +67,7 @@ final class Settings: ObservableObject {
 // MARK: - Sound
 
 enum Chime: String {
+    case intro = "Submarine"
     case step = "Tink"
     case granted = "Glass"
     case finished = "Hero"

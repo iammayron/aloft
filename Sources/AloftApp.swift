@@ -26,26 +26,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     private var monitor: Any?
     private var onboarding: NSWindow?
+    private var intro: NSWindow?
+
+    /// Full-screen title card on first run. It sits above everything including the
+    /// menu bar, so it is dismissible by click as well as on its own timer.
+    private func showIntro() {
+        guard let screen = NSScreen.main else { showOnboarding(); return }
+        let window = NSWindow(contentRect: screen.frame, styleMask: .borderless,
+                              backing: .buffered, defer: false)
+        window.level = .screenSaver
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        window.backgroundColor = .black
+        window.isOpaque = false
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: IntroView(soundsEnabled: settings.soundsEnabled, finish: { [weak self] in
+            self?.dismissIntro()
+        }))
+        intro = window
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+
+        // Nothing should be able to leave a full-screen window stuck over the desktop.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            self?.dismissIntro()
+        }
+    }
+
+    private func dismissIntro() {
+        guard intro != nil else { return }
+        intro?.close()
+        intro = nil
+        showOnboarding()
+    }
 
     /// Onboarding is a real window rather than a menu-bar popover: it has to survive
     /// the user going into System Settings to grant a permission and coming back.
     private func showOnboarding() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 470),
+            contentRect: NSRect(origin: .zero, size: OnboardingView.size),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
-        window.center()
-        window.contentView = NSHostingView(rootView: OnboardingView(
+        let host = NSHostingView(rootView: OnboardingView(
             settings: settings, windows: windows, thumbnails: thumbnails,
             finish: { [weak self] in
                 self?.settings.onboarded = true
                 self?.onboarding?.close()
                 self?.onboarding = nil
             }))
+        // Without this the hosting view reports the content's ideal height — which the
+        // Spacers make unbounded — and grows the window to match.
+        host.sizingOptions = []
+        window.contentView = host
+        window.setContentSize(OnboardingView.size)
+        window.center()
         onboarding = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -56,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if settings.onboarded {
             if !AX.isTrusted { AX.requestTrust() }
         } else {
-            showOnboarding()
+            showIntro()
         }
 
         // Only warm previews when the permission already exists: SCShareableContent is

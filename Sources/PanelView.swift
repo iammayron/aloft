@@ -28,6 +28,7 @@ struct PanelView: View {
         }
         .frame(width: 452)
         .task {
+            settings.panelSeen = true
             windows.refresh()
             await thumbnails.beginSession()
         }

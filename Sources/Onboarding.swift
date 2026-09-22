@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Step: Int, CaseIterable {
-    case welcome, accessibility, previews, shortcut, firstPin, done
+    case welcome, accessibility, previews, shortcut, firstPin, menuBar, done
 
     var symbol: String {
         switch self {
@@ -11,6 +11,7 @@ enum Step: Int, CaseIterable {
         case .previews:      "photo.on.rectangle.angled"
         case .shortcut:      "keyboard"
         case .firstPin:      "hand.tap.fill"
+        case .menuBar:       "menubar.arrow.up.rectangle"
         case .done:          "checkmark.seal.fill"
         }
     }
@@ -22,6 +23,7 @@ enum Step: Int, CaseIterable {
         case .previews:      "Show live previews"
         case .shortcut:      "Pick your shortcut"
         case .firstPin:      "Pin your first window"
+        case .menuBar:       "The rest lives in the menu bar"
         case .done:          "You're set"
         }
     }
@@ -38,13 +40,17 @@ enum Step: Int, CaseIterable {
             "This pins whichever window you're looking at, from anywhere. Click the key combination to change it."
         case .firstPin:
             "Click any other window to focus it, then press your shortcut. A pin marker appears in its title bar."
+        case .menuBar:
+            "Open it to pin from a grid of live previews — and to do everything below."
         case .done:
-            "Aloft lives in your menu bar. Click the pin to open the picker, or use your shortcut anywhere."
+            "Pin from the menu bar grid or with your shortcut — whichever is closer to hand."
         }
     }
 }
 
 struct OnboardingView: View {
+    static let size = CGSize(width: 540, height: 448)
+
     @ObservedObject var settings: Settings
     @ObservedObject var windows: WindowList
     @ObservedObject var thumbnails: Thumbnails
@@ -63,7 +69,7 @@ struct OnboardingView: View {
             controls
             dots
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: Self.size.width, height: Self.size.height)
         .background(backdrop)
         .task(id: step) { await watchForCompletion() }
     }
@@ -75,7 +81,7 @@ struct OnboardingView: View {
             Color(nsColor: .windowBackgroundColor)
             RadialGradient(colors: [.accentColor.opacity(0.22), .clear],
                            center: .init(x: 0.5, y: 0.26),
-                           startRadius: 4, endRadius: 320)
+                           startRadius: 4, endRadius: 280)
                 .blur(radius: 24)
                 .animation(.easeInOut(duration: 0.6), value: step)
         }
@@ -86,23 +92,23 @@ struct OnboardingView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.tint.opacity(0.16))
-                .frame(width: 92, height: 92)
+                .frame(width: 80, height: 80)
 
             Image(systemName: celebrating ? "checkmark" : step.symbol)
-                .font(.system(size: 38, weight: .medium))
+                .font(.system(size: 33, weight: .medium))
                 .foregroundStyle(celebrating ? AnyShapeStyle(.green) : AnyShapeStyle(.tint))
                 .contentTransition(.symbolEffect(.replace.downUp))
                 .symbolEffect(.bounce, value: step)
         }
         .scaleEffect(celebrating ? 1.14 : 1)
         .animation(.spring(response: 0.34, dampingFraction: 0.55), value: celebrating)
-        .padding(.bottom, 22)
+        .padding(.bottom, 18)
     }
 
     private var copy: some View {
         VStack(spacing: 9) {
             Text(step.title)
-                .font(.system(size: 23, weight: .semibold, design: .rounded))
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
             Text(step.body)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
@@ -149,6 +155,16 @@ struct OnboardingView: View {
                 ShortcutRecorder(shortcut: $settings.shortcut)
                 primary("Continue") { advance() }
 
+            case .menuBar:
+                VStack(alignment: .leading, spacing: 9) {
+                    hint("pin", "Click the pin in your menu bar")
+                    hint("square.grid.2x2", "Pick any window from the grid to pin it")
+                    hint("keyboard", "Change your shortcut in the panel footer")
+                    hint("power", "Quit Aloft from that same footer")
+                }
+                .frame(width: 330)
+                waitingLabel("Open the menu bar panel to continue…")
+
             case .firstPin:
                 Text(settings.shortcut.display)
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
@@ -169,7 +185,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        .frame(height: 104)
+        .frame(height: step == .menuBar ? 148 : 92)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
     }
 
@@ -182,7 +198,7 @@ struct OnboardingView: View {
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.72), value: step)
-        .padding(.bottom, 26)
+        .padding(.bottom, 22)
     }
 
     // MARK: - Pieces
@@ -197,6 +213,19 @@ struct OnboardingView: View {
         Button(label, action: action)
             .buttonStyle(.glass)
             .controlSize(.small)
+    }
+
+    private func hint(_ symbol: String, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 16)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
     }
 
     private func grantedLabel(_ text: String) -> some View {
@@ -230,6 +259,7 @@ struct OnboardingView: View {
         case .accessibility: { AX.isTrusted }
         case .previews:      { CGPreflightScreenCaptureAccess() }
         case .firstPin:      { !windows.pinned.isEmpty }
+        case .menuBar:       { settings.panelSeen }
         default:             nil
         }
     }
